@@ -36,11 +36,11 @@ class ServoSE(Group):
         analysis_options = self.options['analysis_options']
 
         self.add_subsystem('powercurve',        RegulatedPowerCurve(analysis_options   = analysis_options), promotes = ['v_min', 'v_max','rated_power','omega_min','omega_max', 'control_maxTS','tsr_operational','control_pitch','drivetrainType','drivetrainEff','r','chord', 'theta','Rhub', 'Rtip', 'hub_height','precone', 'tilt','yaw','precurve','precurveTip','presweep','presweepTip', 'airfoils_aoa','airfoils_Re','airfoils_cl','airfoils_cd','airfoils_cm', 'nBlades', 'rho', 'mu'])
-        self.add_subsystem('aeroperf_tables',   Cp_Ct_Cq_Tables(analysis_options   = analysis_options), promotes = ['v_min', 'v_max','r','chord', 'theta','Rhub', 'Rtip', 'hub_height','precone', 'tilt','yaw','precurve','precurveTip','presweep','presweepTip', 'airfoils_aoa','airfoils_Re','airfoils_cl','airfoils_cd','airfoils_cm', 'nBlades', 'rho', 'mu'])
         self.add_subsystem('stall_check',       NoStallConstraint(analysis_options   = analysis_options), promotes = ['airfoils_aoa','airfoils_cl','airfoils_cd','airfoils_cm'])
         self.add_subsystem('cdf',               WeibullWithMeanCDF(nspline=analysis_options['servose']['n_pc_spline']))
         self.add_subsystem('aep',               AEP(), promotes=['AEP'])
         if analysis_options['openfast']['run_openfast'] == True:
+            self.add_subsystem('aeroperf_tables',   Cp_Ct_Cq_Tables(analysis_options   = analysis_options), promotes = ['v_min', 'v_max','r','chord', 'theta','Rhub', 'Rtip', 'hub_height','precone', 'tilt','yaw','precurve','precurveTip','presweep','presweepTip', 'airfoils_aoa','airfoils_Re','airfoils_cl','airfoils_cd','airfoils_cm', 'nBlades', 'rho', 'mu'])
             self.add_subsystem('tune_rosco',        TuneROSCO(analysis_options = analysis_options), promotes = ['v_min', 'v_max', 'rho', 'omega_min', 'tsr_operational', 'rated_power'])
         # Connections to the stall check
         self.connect('powercurve.aoa_cutin','stall_check.aoa_along_span')
@@ -288,7 +288,7 @@ class RegulatedPowerCurve(ExplicitComponent): # Implicit COMPONENT
         self.n_Re          = n_Re      = analysis_options['airfoils']['n_Re'] # Number of Reynolds, so far hard set at 1
         self.n_tab         = n_tab     = analysis_options['airfoils']['n_tab']# Number of tabulated data. For distributed aerodynamic control this could be > 1
         # self.n_xy          = n_xy      = af_init_options['n_xy'] # Number of coordinate points to describe the airfoil geometry
-        self.regulation_reg_III = True
+        self.regulation_reg_III = analysis_options['servose']['regulation_reg_III']
         # naero       = self.naero = self.options['naero']
         self.n_pc          = analysis_options['servose']['n_pc']
         self.n_pc_spline   = analysis_options['servose']['n_pc_spline']
@@ -733,9 +733,12 @@ class Cp_Ct_Cq_Tables(ExplicitComponent):
         outputs['U_vector']     = U_vector
                 
         R = inputs['Rtip']
-        
+        k=0
         for i in range(n_U):
             for j in range(n_tsr):
+                k +=1
+                # if k/2. == int(k/2.) :
+                print('Cp-Ct-Cq surfaces completed at ' + str(int(k/(n_U*n_tsr)*100.)) + ' %')
                 U     =  U_vector[i] * np.ones(n_pitch)
                 Omega = tsr_vector[j] *  U_vector[i] / R * 30. / np.pi * np.ones(n_pitch)
                 _, _, _, _, outputs['Cp'][j,:,i], outputs['Ct'][j,:,i], outputs['Cq'][j,:,i], _ = self.ccblade.evaluate(U, Omega, pitch_vector, coefficients=True)
